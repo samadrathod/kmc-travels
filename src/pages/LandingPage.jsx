@@ -374,6 +374,9 @@ export default function LandingPage() {
           <p>Phone: 0265-2339400 | Mobile: 9099910360</p>
           <p>Email: kmctravels@yahoo.in | Web: www.kmctravels.com</p>
         </div>
+         <a href="/admin" style={{ color: "#bbb", fontSize: "11px", alignSelf: "flex-end" }}>
+    Admin
+  </a>
       </footer>
 
       <a className="kmc-floating-call" href="tel:+919099910360">Call KMC</a>

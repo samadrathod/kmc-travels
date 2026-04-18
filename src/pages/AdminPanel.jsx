@@ -1,23 +1,35 @@
 import { useEffect, useState } from "react";
 import axios from "axios";
- 
+
 const API = "http://localhost:5000";
- 
+const ADMIN_PASSWORD = "kmc2025";
+
 export default function AdminPanel() {
+  const [unlocked, setUnlocked] = useState(false);
+  const [passwordInput, setPasswordInput] = useState("");
+  const [passwordError, setPasswordError] = useState("");
+
   const [bookings, setBookings] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [search, setSearch] = useState("");
- 
+
   useEffect(() => {
-    fetchBookings();
+    if (sessionStorage.getItem("kmc_admin") === "true") {
+      setUnlocked(true);
+    }
   }, []);
- 
+
+  useEffect(() => {
+    if (unlocked) {
+      fetchBookings();
+    }
+  }, [unlocked]);
+
   async function fetchBookings() {
     try {
       setLoading(true);
       const res = await axios.get(`${API}/api/bookings`);
-      // newest first
       setBookings(res.data.reverse());
       setError("");
     } catch (err) {
@@ -26,7 +38,16 @@ export default function AdminPanel() {
       setLoading(false);
     }
   }
- 
+
+  function handlePasswordSubmit() {
+    if (passwordInput === ADMIN_PASSWORD) {
+      sessionStorage.setItem("kmc_admin", "true");
+      setUnlocked(true);
+    } else {
+      setPasswordError("Incorrect password.");
+    }
+  }
+
   const filtered = bookings.filter((b) => {
     const q = search.toLowerCase();
     return (
@@ -36,10 +57,32 @@ export default function AdminPanel() {
       b.destination?.toLowerCase().includes(q)
     );
   });
- 
+
+  if (!unlocked) {
+    return (
+      <div style={styles.lockScreen}>
+        <div style={styles.lockCard}>
+          <h2 style={styles.lockTitle}>KMC Admin</h2>
+          <p style={styles.lockSub}>Enter password to continue</p>
+          <input
+            type="password"
+            placeholder="Password"
+            value={passwordInput}
+            onChange={(e) => setPasswordInput(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && handlePasswordSubmit()}
+            style={styles.lockInput}
+          />
+          {passwordError && <p style={styles.lockError}>{passwordError}</p>}
+          <button onClick={handlePasswordSubmit} style={styles.lockBtn}>
+            Unlock
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div style={styles.page}>
-      {/* Header */}
       <div style={styles.header}>
         <div>
           <h1 style={styles.title}>KMC Travels</h1>
@@ -49,8 +92,7 @@ export default function AdminPanel() {
           ↻ Refresh
         </button>
       </div>
- 
-      {/* Stats bar */}
+
       <div style={styles.statsBar}>
         <div style={styles.statCard}>
           <span style={styles.statNum}>{bookings.length}</span>
@@ -67,8 +109,7 @@ export default function AdminPanel() {
           <span style={styles.statLabel}>Today</span>
         </div>
       </div>
- 
-      {/* Search */}
+
       <input
         type="text"
         placeholder="Search by name, phone, pickup or destination..."
@@ -76,15 +117,13 @@ export default function AdminPanel() {
         onChange={(e) => setSearch(e.target.value)}
         style={styles.searchInput}
       />
- 
-      {/* States */}
+
       {loading && <p style={styles.info}>Loading bookings...</p>}
       {error && <p style={styles.errorText}>{error}</p>}
       {!loading && !error && filtered.length === 0 && (
         <p style={styles.info}>No bookings found.</p>
       )}
- 
-      {/* Table */}
+
       {!loading && !error && filtered.length > 0 && (
         <div style={styles.tableWrapper}>
           <table style={styles.table}>
@@ -136,8 +175,61 @@ export default function AdminPanel() {
     </div>
   );
 }
- 
+
 const styles = {
+  lockScreen: {
+    minHeight: "100vh",
+    background: "#0f1117",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  lockCard: {
+    background: "#1e2230",
+    padding: "40px 36px",
+    borderRadius: "16px",
+    width: "100%",
+    maxWidth: "360px",
+    display: "flex",
+    flexDirection: "column",
+    gap: "16px",
+  },
+  lockTitle: {
+    margin: 0,
+    color: "#f5c518",
+    fontFamily: "'Segoe UI', sans-serif",
+    fontSize: "24px",
+    fontWeight: 700,
+  },
+  lockSub: {
+    margin: 0,
+    color: "#888",
+    fontSize: "14px",
+  },
+  lockInput: {
+    padding: "10px 14px",
+    borderRadius: "8px",
+    border: "1px solid #2e3347",
+    background: "#13161f",
+    color: "#e8e8e8",
+    fontSize: "15px",
+    outline: "none",
+  },
+  lockError: {
+    margin: 0,
+    color: "#ff6b6b",
+    fontSize: "13px",
+  },
+  lockBtn: {
+    padding: "10px",
+    borderRadius: "8px",
+    border: "none",
+    background: "#f5c518",
+    color: "#0f1117",
+    fontWeight: 700,
+    fontSize: "15px",
+    cursor: "pointer",
+  },
   page: {
     minHeight: "100vh",
     background: "#0f1117",
