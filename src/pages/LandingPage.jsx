@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import axios from 'axios'
 import './LandingPage.css'
 
 const serviceOptions = ['Local', 'Outstation', 'Airport', 'Corporate']
@@ -120,12 +121,18 @@ export default function LandingPage() {
     window.open(createWhatsAppLink(buildQuickBookingMessage(quickForm)), '_blank', 'noopener,noreferrer')
   }
 
-  const submitBookingForm = (event) => {
+  const submitBookingForm = async (event) => {
     event.preventDefault()
 
     if (!bookingForm.fullName.trim() || !bookingForm.phone.trim() || !bookingForm.pickup.trim() || !bookingForm.destination.trim()) {
       setBookingError('Please fill in name, phone, pickup, and destination before sending the enquiry.')
       return
+    }
+
+    try {
+      await axios.post('http://localhost:5000/api/bookings', bookingForm)
+    } catch (error) {
+      console.error('Could not save booking:', error.message)
     }
 
     setBookingError('')
