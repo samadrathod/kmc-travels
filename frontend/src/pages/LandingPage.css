@@ -18,6 +18,7 @@
     linear-gradient(180deg, #f7f0e5 0%, #f2ece2 100%);
   color: var(--ink);
   font-family: 'Barlow', sans-serif;
+  -webkit-tap-highlight-color: rgba(17, 37, 68, 0.16);
 }
 
 .kmc-page * {
@@ -34,6 +35,22 @@
 .kmc-page select,
 .kmc-page textarea {
   font: inherit;
+  touch-action: manipulation;
+}
+
+.kmc-page h1,
+.kmc-page h2,
+.kmc-page h3 {
+  text-wrap: balance;
+}
+
+.kmc-page button:focus-visible,
+.kmc-page a:focus-visible,
+.kmc-page input:focus-visible,
+.kmc-page select:focus-visible,
+.kmc-page textarea:focus-visible {
+  outline: 3px solid rgba(203, 70, 39, 0.34);
+  outline-offset: 3px;
 }
 
 .kmc-header,
@@ -58,6 +75,22 @@
   background: rgba(243, 238, 229, 0.84);
   backdrop-filter: blur(18px);
   border-bottom: 1px solid rgba(17, 37, 68, 0.08);
+  padding-top: calc(18px + env(safe-area-inset-top, 0px));
+}
+
+.kmc-skip-link {
+  position: absolute;
+  left: 18px;
+  top: -80px;
+  z-index: 40;
+  padding: 12px 16px;
+  background: var(--navy);
+  color: var(--white);
+  border-radius: 14px;
+}
+
+.kmc-skip-link:focus {
+  top: 18px;
 }
 
 .kmc-brand {
@@ -119,6 +152,28 @@
   display: flex;
   gap: 28px;
   color: var(--muted);
+}
+
+.kmc-menu-toggle {
+  display: none;
+  width: 48px;
+  height: 48px;
+  padding: 0;
+  border: 1px solid rgba(17, 37, 68, 0.12);
+  border-radius: 14px;
+  background: rgba(255, 249, 241, 0.8);
+  color: var(--ink);
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+}
+
+.kmc-menu-toggle span {
+  width: 18px;
+  height: 2px;
+  background: currentColor;
+  border-radius: 999px;
 }
 
 .kmc-nav a {
@@ -342,6 +397,13 @@
 
 .kmc-form-hint {
   color: var(--muted);
+}
+
+#services,
+#fleet,
+#coverage,
+#contact {
+  scroll-margin-top: 108px;
 }
 
 .kmc-proof {
@@ -624,7 +686,7 @@
 .kmc-floating-call {
   position: fixed;
   right: 18px;
-  bottom: 18px;
+  bottom: calc(18px + env(safe-area-inset-bottom, 0px));
   z-index: 30;
   box-shadow: 0 18px 30px rgba(203, 70, 39, 0.24);
 }
@@ -635,8 +697,26 @@
 }
 
 @media (max-width: 1080px) {
+  .kmc-menu-toggle {
+    display: inline-flex;
+  }
+
   .kmc-nav {
     display: none;
+    position: absolute;
+    top: calc(100% + 12px);
+    right: 18px;
+    left: 18px;
+    padding: 16px;
+    border-radius: 22px;
+    background: rgba(255, 249, 241, 0.98);
+    box-shadow: var(--shadow);
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .kmc-nav.kmc-nav-open {
+    display: flex;
   }
 
   .kmc-hero-grid,
@@ -666,6 +746,14 @@
 
   .kmc-header-cta {
     display: none;
+  }
+
+  .kmc-brand-copy small {
+    font-size: 0.72rem;
+  }
+
+  .kmc-card-top {
+    flex-direction: column;
   }
 
   .kmc-hero-card {

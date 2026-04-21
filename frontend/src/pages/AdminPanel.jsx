@@ -1,353 +1,447 @@
-import { useEffect, useState } from "react";
-import axios from "axios";
+import { useDeferredValue, useEffect, useState } from 'react'
+import axios from 'axios'
+import { buildAdminHeaders, buildApiUrl } from '../lib/api'
+import './AdminPanel.css'
 
-const API = "http://localhost:5000";
-const ADMIN_PASSWORD = "kmc2025";
+const ADMIN_STORAGE_KEY = 'kmc_admin_password'
+const bookingDateFormatter = new Intl.DateTimeFormat('en-IN', {
+  day: '2-digit',
+  month: 'short',
+  year: 'numeric',
+  hour: '2-digit',
+  minute: '2-digit',
+})
+const statusOptions = ['pending', 'confirmed', 'done']
+
+async function requestBookings(password) {
+  const res = await axios.get(buildApiUrl('/api/bookings'), {
+    headers: buildAdminHeaders(password),
+  })
+
+  return res.data
+}
+
+async function updateBooking(password, bookingId, updates) {
+  const res = await axios.patch(buildApiUrl(`/api/bookings/${bookingId}`), updates, {
+    headers: buildAdminHeaders(password),
+  })
+
+  return res.data
+}
+
+async function deleteBooking(password, bookingId) {
+  await axios.delete(buildApiUrl(`/api/bookings/${bookingId}`), {
+    headers: buildAdminHeaders(password),
+  })
+}
+
+function formatBookingTime(createdAt) {
+  if (!createdAt) {
+    return '-'
+  }
+
+  return bookingDateFormatter.format(new Date(createdAt))
+}
+
+function normalizeStatus(status) {
+  return statusOptions.includes(status) ? status : 'pending'
+}
 
 export default function AdminPanel() {
-  const [unlocked, setUnlocked] = useState(false);
-  const [passwordInput, setPasswordInput] = useState("");
-  const [passwordError, setPasswordError] = useState("");
+  const [adminPassword, setAdminPassword] = useState('')
+  const [passwordInput, setPasswordInput] = useState('')
+  const [passwordError, setPasswordError] = useState('')
 
-  const [bookings, setBookings] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-  const [search, setSearch] = useState("");
-
-  useEffect(() => {
-    if (sessionStorage.getItem("kmc_admin") === "true") {
-      setUnlocked(true);
-    }
-  }, []);
+  const [bookings, setBookings] = useState([])
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+  const [search, setSearch] = useState('')
+  const [actionMessage, setActionMessage] = useState('')
+  const [busyBookingId, setBusyBookingId] = useState('')
+  const deferredSearch = useDeferredValue(search)
 
   useEffect(() => {
-    if (unlocked) {
-      fetchBookings();
+    const savedPassword = sessionStorage.getItem(ADMIN_STORAGE_KEY)
+    if (savedPassword) {
+      setAdminPassword(savedPassword)
     }
-  }, [unlocked]);
+  }, [])
 
-  async function fetchBookings() {
+  useEffect(() => {
+    if (adminPassword) {
+      const loadBookings = async () => {
+        try {
+          setLoading(true)
+          const nextBookings = await requestBookings(adminPassword)
+          setBookings(nextBookings)
+          setError('')
+          setPasswordError('')
+        } catch (requestError) {
+          if (requestError.response?.status === 401) {
+            sessionStorage.removeItem(ADMIN_STORAGE_KEY)
+            setAdminPassword('')
+            setBookings([])
+            setPasswordError('Incorrect password.')
+            return
+          }
+
+          setError('Failed to load bookings. Make sure the backend is running and the API URL is correct.')
+        } finally {
+          setLoading(false)
+        }
+      }
+
+      loadBookings()
+    }
+  }, [adminPassword])
+
+  async function fetchBookings(password = adminPassword) {
     try {
-      setLoading(true);
-      const res = await axios.get(`${API}/api/bookings`);
-      setBookings(res.data.reverse());
-      setError("");
-    } catch (err) {
-      setError("Failed to load bookings. Make sure the backend is running.");
+      setLoading(true)
+      const nextBookings = await requestBookings(password)
+      setBookings(nextBookings)
+      setError('')
+      setPasswordError('')
+    } catch (requestError) {
+      if (requestError.response?.status === 401) {
+        sessionStorage.removeItem(ADMIN_STORAGE_KEY)
+        setAdminPassword('')
+        setBookings([])
+        setPasswordError('Incorrect password.')
+        return
+      }
+
+      setError('Failed to load bookings. Make sure the backend is running and the API URL is correct.')
     } finally {
-      setLoading(false);
+      setLoading(false)
     }
   }
 
-  function handlePasswordSubmit() {
-    if (passwordInput === ADMIN_PASSWORD) {
-      sessionStorage.setItem("kmc_admin", "true");
-      setUnlocked(true);
-    } else {
-      setPasswordError("Incorrect password.");
+  async function handlePasswordSubmit() {
+    const trimmedPassword = passwordInput.trim()
+
+    if (!trimmedPassword) {
+      setPasswordError('Enter the admin password.')
+      return
+    }
+
+    try {
+      setLoading(true)
+      const nextBookings = await requestBookings(trimmedPassword)
+      sessionStorage.setItem(ADMIN_STORAGE_KEY, trimmedPassword)
+      setAdminPassword(trimmedPassword)
+      setBookings(nextBookings)
+      setPasswordInput('')
+      setPasswordError('')
+      setError('')
+      setActionMessage('')
+    } catch (requestError) {
+      if (requestError.response?.status === 401) {
+        setPasswordError('Incorrect password.')
+      } else {
+        setPasswordError('Could not reach the admin portal.')
+      }
+    } finally {
+      setLoading(false)
     }
   }
 
-  const filtered = bookings.filter((b) => {
-    const q = search.toLowerCase();
-    return (
-      b.name?.toLowerCase().includes(q) ||
-      b.phone?.toLowerCase().includes(q) ||
-      b.pickup?.toLowerCase().includes(q) ||
-      b.destination?.toLowerCase().includes(q)
-    );
-  });
+  function handleLogout() {
+    sessionStorage.removeItem(ADMIN_STORAGE_KEY)
+    setAdminPassword('')
+    setPasswordInput('')
+    setBookings([])
+    setSearch('')
+    setPasswordError('')
+    setError('')
+    setActionMessage('')
+    setBusyBookingId('')
+  }
 
-  if (!unlocked) {
+  async function handleStatusChange(bookingId, nextStatus) {
+    try {
+      setBusyBookingId(bookingId)
+      const updatedBooking = await updateBooking(adminPassword, bookingId, { status: nextStatus })
+      setBookings((current) => current.map((booking) => (
+        booking._id === bookingId ? updatedBooking : booking
+      )))
+      setActionMessage(`Status updated to ${nextStatus}.`)
+      setError('')
+    } catch (requestError) {
+      setError(requestError.response?.data?.message || 'Could not update booking status.')
+    } finally {
+      setBusyBookingId('')
+    }
+  }
+
+  async function handleDelete(bookingId) {
+    const confirmed = window.confirm('Delete this booking record permanently?')
+    if (!confirmed) {
+      return
+    }
+
+    try {
+      setBusyBookingId(bookingId)
+      await deleteBooking(adminPassword, bookingId)
+      setBookings((current) => current.filter((booking) => booking._id !== bookingId))
+      setActionMessage('Booking deleted successfully.')
+      setError('')
+    } catch (requestError) {
+      setError(requestError.response?.data?.message || 'Could not delete booking.')
+    } finally {
+      setBusyBookingId('')
+    }
+  }
+
+  const normalizedSearch = deferredSearch.trim().toLowerCase()
+  const filtered = bookings.filter((booking) => {
+    if (!normalizedSearch) {
+      return true
+    }
+
     return (
-      <div style={styles.lockScreen}>
-        <div style={styles.lockCard}>
-          <h2 style={styles.lockTitle}>KMC Admin</h2>
-          <p style={styles.lockSub}>Enter password to continue</p>
-          <input
-            type="password"
-            placeholder="Password"
-            value={passwordInput}
-            onChange={(e) => setPasswordInput(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && handlePasswordSubmit()}
-            style={styles.lockInput}
-          />
-          {passwordError && <p style={styles.lockError}>{passwordError}</p>}
-          <button onClick={handlePasswordSubmit} style={styles.lockBtn}>
-            Unlock
+      booking.fullName?.toLowerCase().includes(normalizedSearch) ||
+      booking.phone?.toLowerCase().includes(normalizedSearch) ||
+      booking.pickup?.toLowerCase().includes(normalizedSearch) ||
+      booking.destination?.toLowerCase().includes(normalizedSearch)
+    )
+  })
+
+  const pendingCount = bookings.filter((booking) => normalizeStatus(booking.status) === 'pending').length
+  const confirmedCount = bookings.filter((booking) => normalizeStatus(booking.status) === 'confirmed').length
+  const doneCount = bookings.filter((booking) => normalizeStatus(booking.status) === 'done').length
+
+  if (!adminPassword) {
+    return (
+      <div className="admin-lock-screen">
+        <div className="admin-lock-card">
+          <div>
+            <p className="admin-kicker">Authorized Access</p>
+            <h2 className="admin-title">KMC Operations Portal</h2>
+            <p className="admin-subtitle">Use your server admin password to access bookings, update status, and manage records.</p>
+          </div>
+          <label className="admin-field">
+            <span className="admin-field-label">Admin Password</span>
+            <input
+              className="admin-input"
+              type="password"
+              name="adminPassword"
+              autoComplete="current-password"
+              placeholder="Enter Password..."
+              value={passwordInput}
+              onChange={(event) => setPasswordInput(event.target.value)}
+              onKeyDown={(event) => event.key === 'Enter' && handlePasswordSubmit()}
+            />
+          </label>
+          {passwordError && <p className="admin-error" aria-live="polite">{passwordError}</p>}
+          <button type="button" onClick={handlePasswordSubmit} className="admin-primary-btn" disabled={loading}>
+            {loading ? 'Checking...' : 'Enter Portal'}
           </button>
         </div>
       </div>
-    );
+    )
   }
 
   return (
-    <div style={styles.page}>
-      <div style={styles.header}>
+    <div className="admin-page">
+      <div className="admin-topbar">
         <div>
-          <h1 style={styles.title}>KMC Travels</h1>
-          <p style={styles.subtitle}>Admin Panel — All Bookings</p>
+          <p className="admin-kicker">KMC Operations</p>
+          <h1 className="admin-title">Booking Management Console</h1>
+          <p className="admin-subtitle">Track enquiries, move them through the workflow, and manage records securely.</p>
         </div>
-        <button onClick={fetchBookings} style={styles.refreshBtn}>
-          ↻ Refresh
-        </button>
-      </div>
-
-      <div style={styles.statsBar}>
-        <div style={styles.statCard}>
-          <span style={styles.statNum}>{bookings.length}</span>
-          <span style={styles.statLabel}>Total Enquiries</span>
-        </div>
-        <div style={styles.statCard}>
-          <span style={styles.statNum}>
-            {bookings.filter((b) => {
-              const d = new Date(b.createdAt);
-              const today = new Date();
-              return d.toDateString() === today.toDateString();
-            }).length}
-          </span>
-          <span style={styles.statLabel}>Today</span>
+        <div className="admin-topbar-actions">
+          <button type="button" onClick={() => fetchBookings()} className="admin-secondary-btn" disabled={loading}>
+            Refresh
+          </button>
+          <button type="button" onClick={handleLogout} className="admin-ghost-btn">
+            Logout
+          </button>
         </div>
       </div>
 
-      <input
-        type="text"
-        placeholder="Search by name, phone, pickup or destination..."
-        value={search}
-        onChange={(e) => setSearch(e.target.value)}
-        style={styles.searchInput}
-      />
+      <div className="admin-stats">
+        <div className="admin-stat-card">
+          <span className="admin-stat-num">{bookings.length}</span>
+          <span className="admin-stat-label">Total Enquiries</span>
+        </div>
+        <div className="admin-stat-card">
+          <span className="admin-stat-num">{pendingCount}</span>
+          <span className="admin-stat-label">Pending</span>
+        </div>
+        <div className="admin-stat-card">
+          <span className="admin-stat-num">{confirmedCount}</span>
+          <span className="admin-stat-label">Confirmed</span>
+        </div>
+        <div className="admin-stat-card">
+          <span className="admin-stat-num">{doneCount}</span>
+          <span className="admin-stat-label">Done</span>
+        </div>
+      </div>
 
-      {loading && <p style={styles.info}>Loading bookings...</p>}
-      {error && <p style={styles.errorText}>{error}</p>}
+      <div className="admin-toolbar">
+        <label className="admin-field admin-search">
+          <span className="admin-field-label">Search Enquiries</span>
+          <input
+            className="admin-input"
+            type="search"
+            name="searchBookings"
+            autoComplete="off"
+            placeholder="Search by name, phone, pickup or destination..."
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+          />
+        </label>
+        {actionMessage && <p className="admin-success-banner" aria-live="polite">{actionMessage}</p>}
+      </div>
+
+      {loading && <p className="admin-info" aria-live="polite">Loading bookings...</p>}
+      {error && <p className="admin-error-banner" aria-live="polite">{error}</p>}
       {!loading && !error && filtered.length === 0 && (
-        <p style={styles.info}>No bookings found.</p>
+        <p className="admin-info">No bookings found.</p>
       )}
 
       {!loading && !error && filtered.length > 0 && (
-        <div style={styles.tableWrapper}>
-          <table style={styles.table}>
-            <thead>
-              <tr>
-                {["#", "Name", "Phone", "Pickup", "Destination", "Date", "Return?", "Message", "Submitted"].map(
-                  (h) => (
-                    <th key={h} style={styles.th}>
-                      {h}
+        <>
+          <div className="admin-table-wrap">
+            <table className="admin-table">
+              <thead>
+                <tr>
+                  {['#', 'Name', 'Phone', 'Pickup', 'Destination', 'Date', 'Vehicle', 'Status', 'Trip Notes', 'Submitted', 'Actions'].map((heading) => (
+                    <th key={heading}>
+                      {heading}
                     </th>
-                  )
-                )}
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map((b, i) => (
-                <tr key={b._id} style={i % 2 === 0 ? styles.trEven : styles.trOdd}>
-                  <td style={styles.td}>{i + 1}</td>
-                  <td style={styles.td}>{b.name || "—"}</td>
-                  <td style={styles.td}>
-                    <a href={`tel:${b.phone}`} style={styles.phoneLink}>
-                      {b.phone || "—"}
-                    </a>
-                  </td>
-                  <td style={styles.td}>{b.pickup || "—"}</td>
-                  <td style={styles.td}>{b.destination || "—"}</td>
-                  <td style={styles.td}>{b.date || "—"}</td>
-                  <td style={styles.td}>{b.returnTrip ? "Yes" : "No"}</td>
-                  <td style={{ ...styles.td, maxWidth: "200px", wordBreak: "break-word" }}>
-                    {b.message || "—"}
-                  </td>
-                  <td style={styles.td}>
-                    {b.createdAt
-                      ? new Date(b.createdAt).toLocaleString("en-IN", {
-                          day: "2-digit",
-                          month: "short",
-                          year: "numeric",
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        })
-                      : "—"}
-                  </td>
+                  ))}
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {filtered.map((booking, index) => {
+                  const status = normalizeStatus(booking.status)
+                  const isBusy = busyBookingId === booking._id
+
+                  return (
+                    <tr key={booking._id}>
+                      <td>{index + 1}</td>
+                      <td>{booking.fullName || '-'}</td>
+                      <td>
+                        <a href={`tel:${booking.phone}`} className="admin-phone-link">
+                          {booking.phone || '-'}
+                        </a>
+                      </td>
+                      <td>{booking.pickup || '-'}</td>
+                      <td>{booking.destination || '-'}</td>
+                      <td>{booking.date || '-'}</td>
+                      <td>{booking.vehicle || '-'}</td>
+                      <td>
+                        <div className="admin-status-cell">
+                          <span className={`admin-status-badge admin-status-${status}`}>{status}</span>
+                          <select
+                            className="admin-status-select"
+                            value={status}
+                            onChange={(event) => handleStatusChange(booking._id, event.target.value)}
+                            disabled={isBusy}
+                          >
+                            {statusOptions.map((option) => (
+                              <option key={option} value={option}>{option}</option>
+                            ))}
+                          </select>
+                        </div>
+                      </td>
+                      <td className="admin-notes-cell">{booking.notes || '-'}</td>
+                      <td>{formatBookingTime(booking.createdAt)}</td>
+                      <td>
+                        <div className="admin-row-actions">
+                          <button
+                            type="button"
+                            className="admin-danger-btn"
+                            onClick={() => handleDelete(booking._id)}
+                            disabled={isBusy}
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+
+          <div className="admin-card-list">
+            {filtered.map((booking, index) => {
+              const status = normalizeStatus(booking.status)
+              const isBusy = busyBookingId === booking._id
+
+              return (
+                <article className="admin-card" key={booking._id}>
+                  <div className="admin-card-header">
+                    <div>
+                      <p className="admin-card-name">{booking.fullName || 'Unnamed Booking'}</p>
+                      <span className="admin-card-time">{formatBookingTime(booking.createdAt)}</span>
+                    </div>
+                    <span className="admin-card-index">{index + 1}</span>
+                  </div>
+                  <div className="admin-card-grid">
+                    <div className="admin-card-row">
+                      <span className="admin-card-label">Phone</span>
+                      <a href={`tel:${booking.phone}`} className="admin-phone-link admin-card-value">
+                        {booking.phone || '-'}
+                      </a>
+                    </div>
+                    <div className="admin-card-row">
+                      <span className="admin-card-label">Pickup</span>
+                      <span className="admin-card-value">{booking.pickup || '-'}</span>
+                    </div>
+                    <div className="admin-card-row">
+                      <span className="admin-card-label">Destination</span>
+                      <span className="admin-card-value">{booking.destination || '-'}</span>
+                    </div>
+                    <div className="admin-card-row">
+                      <span className="admin-card-label">Date</span>
+                      <span className="admin-card-value">{booking.date || '-'}</span>
+                    </div>
+                    <div className="admin-card-row">
+                      <span className="admin-card-label">Vehicle</span>
+                      <span className="admin-card-value">{booking.vehicle || '-'}</span>
+                    </div>
+                    <div className="admin-card-row">
+                      <span className="admin-card-label">Status</span>
+                      <div className="admin-status-stack">
+                        <span className={`admin-status-badge admin-status-${status}`}>{status}</span>
+                        <select
+                          className="admin-status-select"
+                          value={status}
+                          onChange={(event) => handleStatusChange(booking._id, event.target.value)}
+                          disabled={isBusy}
+                        >
+                          {statusOptions.map((option) => (
+                            <option key={option} value={option}>{option}</option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+                    <div className="admin-card-row">
+                      <span className="admin-card-label">Trip Notes</span>
+                      <span className="admin-card-value">{booking.notes || '-'}</span>
+                    </div>
+                  </div>
+                  <div className="admin-card-actions">
+                    <button
+                      type="button"
+                      className="admin-danger-btn"
+                      onClick={() => handleDelete(booking._id)}
+                      disabled={isBusy}
+                    >
+                      Delete Record
+                    </button>
+                  </div>
+                </article>
+              )
+            })}
+          </div>
+        </>
       )}
     </div>
-  );
+  )
 }
-
-const styles = {
-  lockScreen: {
-    minHeight: "100vh",
-    background: "#0f1117",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  lockCard: {
-    background: "#1e2230",
-    padding: "40px 36px",
-    borderRadius: "16px",
-    width: "100%",
-    maxWidth: "360px",
-    display: "flex",
-    flexDirection: "column",
-    gap: "16px",
-  },
-  lockTitle: {
-    margin: 0,
-    color: "#f5c518",
-    fontFamily: "'Segoe UI', sans-serif",
-    fontSize: "24px",
-    fontWeight: 700,
-  },
-  lockSub: {
-    margin: 0,
-    color: "#888",
-    fontSize: "14px",
-  },
-  lockInput: {
-    padding: "10px 14px",
-    borderRadius: "8px",
-    border: "1px solid #2e3347",
-    background: "#13161f",
-    color: "#e8e8e8",
-    fontSize: "15px",
-    outline: "none",
-  },
-  lockError: {
-    margin: 0,
-    color: "#ff6b6b",
-    fontSize: "13px",
-  },
-  lockBtn: {
-    padding: "10px",
-    borderRadius: "8px",
-    border: "none",
-    background: "#f5c518",
-    color: "#0f1117",
-    fontWeight: 700,
-    fontSize: "15px",
-    cursor: "pointer",
-  },
-  page: {
-    minHeight: "100vh",
-    background: "#0f1117",
-    color: "#e8e8e8",
-    fontFamily: "'Segoe UI', sans-serif",
-    padding: "32px 24px",
-  },
-  header: {
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "flex-start",
-    marginBottom: "28px",
-  },
-  title: {
-    margin: 0,
-    fontSize: "28px",
-    fontWeight: 700,
-    color: "#f5c518",
-    letterSpacing: "0.5px",
-  },
-  subtitle: {
-    margin: "4px 0 0",
-    fontSize: "14px",
-    color: "#888",
-  },
-  refreshBtn: {
-    background: "#1e2230",
-    color: "#f5c518",
-    border: "1px solid #f5c518",
-    borderRadius: "8px",
-    padding: "8px 18px",
-    cursor: "pointer",
-    fontSize: "14px",
-    fontWeight: 600,
-  },
-  statsBar: {
-    display: "flex",
-    gap: "16px",
-    marginBottom: "24px",
-  },
-  statCard: {
-    background: "#1e2230",
-    borderRadius: "10px",
-    padding: "16px 28px",
-    display: "flex",
-    flexDirection: "column",
-    alignItems: "center",
-    minWidth: "120px",
-  },
-  statNum: {
-    fontSize: "32px",
-    fontWeight: 700,
-    color: "#f5c518",
-  },
-  statLabel: {
-    fontSize: "12px",
-    color: "#888",
-    marginTop: "4px",
-    textTransform: "uppercase",
-    letterSpacing: "0.5px",
-  },
-  searchInput: {
-    width: "100%",
-    maxWidth: "480px",
-    padding: "10px 16px",
-    borderRadius: "8px",
-    border: "1px solid #2e3347",
-    background: "#1e2230",
-    color: "#e8e8e8",
-    fontSize: "14px",
-    marginBottom: "20px",
-    outline: "none",
-    boxSizing: "border-box",
-  },
-  info: {
-    color: "#888",
-    fontSize: "15px",
-  },
-  errorText: {
-    color: "#ff6b6b",
-    fontSize: "15px",
-    background: "#2a1a1a",
-    padding: "12px 16px",
-    borderRadius: "8px",
-  },
-  tableWrapper: {
-    overflowX: "auto",
-    borderRadius: "12px",
-    border: "1px solid #2e3347",
-  },
-  table: {
-    width: "100%",
-    borderCollapse: "collapse",
-    fontSize: "14px",
-  },
-  th: {
-    background: "#1a1e2e",
-    color: "#f5c518",
-    padding: "12px 16px",
-    textAlign: "left",
-    fontWeight: 600,
-    whiteSpace: "nowrap",
-    borderBottom: "1px solid #2e3347",
-  },
-  td: {
-    padding: "11px 16px",
-    borderBottom: "1px solid #1e2230",
-    verticalAlign: "top",
-    whiteSpace: "nowrap",
-  },
-  trEven: {
-    background: "#13161f",
-  },
-  trOdd: {
-    background: "#0f1117",
-  },
-  phoneLink: {
-    color: "#4db6ff",
-    textDecoration: "none",
-  },
-};

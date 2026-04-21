@@ -8,7 +8,9 @@ const bookingSchema = new mongoose.Schema({
   date:        { type: String },
   vehicle:     { type: String },
   notes:       { type: String },
+  status:      { type: String, enum: ['pending', 'confirmed', 'done'], default: 'pending' },
   createdAt:   { type: Date, default: Date.now },
+  updatedAt:   { type: Date, default: Date.now },
 })
 
 module.exports = mongoose.model('Booking', bookingSchema)

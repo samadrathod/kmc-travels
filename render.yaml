@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: kmc-travels
+    runtime: node
+    buildCommand: npm ci --prefix frontend && npm ci --prefix backend && npm run build --prefix frontend
+    startCommand: npm start --prefix backend
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: MONGO_URI
+        sync: false
+      - key: ADMIN_PASSWORD
+        sync: false
+      - key: FRONTEND_URLS
+        sync: false

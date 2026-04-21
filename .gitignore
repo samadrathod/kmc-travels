@@ -10,6 +10,7 @@ frontend/dist/
 backend/dist/
 
 *.log
+*.err
 .DS_Store
 .idea/
 .vscode/
