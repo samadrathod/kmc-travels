@@ -137,7 +137,7 @@
   justify-content: space-between;
   align-items: flex-start;
   gap: 16px;
-  margin-bottom: 28px;
+  margin-bottom: 20px;
 }
 
 .admin-topbar-actions {
@@ -145,6 +145,56 @@
   gap: 10px;
   flex-wrap: wrap;
 }
+
+/* ── Tabs ─────────────────────────────────────────────────────────────────── */
+
+.admin-tabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 28px;
+  border-bottom: 1px solid #2e3347;
+}
+
+.admin-tab {
+  min-height: 44px;
+  padding: 10px 20px;
+  background: transparent;
+  border: none;
+  border-bottom: 3px solid transparent;
+  color: #888;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  transition: color 140ms, border-color 140ms;
+}
+
+.admin-tab:hover {
+  color: #e8e8e8;
+}
+
+.admin-tab-active {
+  color: #f5c518;
+  border-bottom-color: #f5c518;
+}
+
+.admin-tab-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: rgba(245, 197, 24, 0.16);
+  color: #f5c518;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+/* ── Stats ────────────────────────────────────────────────────────────────── */
 
 .admin-stats {
   display: grid;
@@ -177,6 +227,8 @@
   text-transform: uppercase;
 }
 
+/* ── Toolbar / Search ─────────────────────────────────────────────────────── */
+
 .admin-toolbar {
   display: flex;
   flex-direction: column;
@@ -208,6 +260,8 @@
   color: #bde7c7;
   font-size: 15px;
 }
+
+/* ── Bookings table ───────────────────────────────────────────────────────── */
 
 .admin-table-wrap {
   overflow-x: auto;
@@ -301,18 +355,15 @@
   font-weight: 600;
 }
 
-.admin-table tbody tr:nth-child(odd) {
-  background: #13161f;
-}
-
-.admin-table tbody tr:nth-child(even) {
-  background: #0f1117;
-}
+.admin-table tbody tr:nth-child(odd)  { background: #13161f; }
+.admin-table tbody tr:nth-child(even) { background: #0f1117; }
 
 .admin-phone-link {
   color: #4db6ff;
   text-decoration: none;
 }
+
+/* ── Booking mobile cards ─────────────────────────────────────────────────── */
 
 .admin-card-list {
   display: none;
@@ -381,6 +432,177 @@
   overflow-wrap: anywhere;
 }
 
+/* ── Fleet tab ────────────────────────────────────────────────────────────── */
+
+.fleet-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.fleet-empty {
+  padding: 32px;
+  border-radius: 14px;
+  background: #1e2230;
+  border: 1px dashed #3a435c;
+  text-align: center;
+  color: #e8e8e8;
+}
+
+.fleet-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 16px;
+}
+
+.fleet-card {
+  padding: 20px;
+  border-radius: 14px;
+  background: #1e2230;
+  border: 1px solid #2e3347;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  transition: opacity 200ms;
+}
+
+.fleet-card-hidden {
+  opacity: 0.5;
+}
+
+.fleet-card-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.fleet-category {
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(245, 197, 24, 0.12);
+  color: #f5c518;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-weight: 700;
+}
+
+.fleet-visibility {
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.fleet-visible {
+  color: #bde7c7;
+}
+
+.fleet-hidden {
+  color: #888;
+}
+
+.fleet-name {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 700;
+  color: #f5c518;
+  font-family: 'Segoe UI', sans-serif;
+}
+
+.fleet-note {
+  margin: 0;
+  font-size: 13px;
+  color: #9ea4af;
+  line-height: 1.5;
+  flex: 1;
+}
+
+.fleet-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.fleet-meta span {
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid #3a435c;
+  font-size: 12px;
+  color: #c2c7d0;
+}
+
+.fleet-rate {
+  color: #f5c518 !important;
+  border-color: rgba(245, 197, 24, 0.3) !important;
+  background: rgba(245, 197, 24, 0.08) !important;
+}
+
+.fleet-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+/* ── Modal ────────────────────────────────────────────────────────────────── */
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  background: rgba(0, 0, 0, 0.72);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+
+.modal-card {
+  width: min(100%, 560px);
+  background: #1e2230;
+  border-radius: 20px;
+  border: 1px solid #2e3347;
+  display: flex;
+  flex-direction: column;
+  max-height: calc(100vh - 48px);
+  overflow: hidden;
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  padding: 24px 24px 16px;
+  border-bottom: 1px solid #2e3347;
+}
+
+.modal-body {
+  padding: 20px 24px;
+  overflow-y: auto;
+}
+
+.modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 16px 24px 20px;
+  border-top: 1px solid #2e3347;
+}
+
+.modal-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+
+.modal-full {
+  grid-column: 1 / -1;
+}
+
+/* ── Responsive ───────────────────────────────────────────────────────────── */
+
 @media (max-width: 820px) {
   .admin-page {
     padding: 24px 16px;
@@ -408,5 +630,14 @@
 
   .admin-card-list {
     display: grid;
+  }
+
+  .fleet-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .modal-grid {
+    grid-template-columns: 1fr;
   }
 }

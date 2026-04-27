@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import axios from 'axios'
 import { buildApiUrl } from '../lib/api'
 import './LandingPage.css'
@@ -21,16 +21,16 @@ const services = [
   ['All kinds of taxi booking', 'From individual car hire to larger group movement, KMC Travels handles practical travel requirements quickly.'],
 ]
 
-const fleet = [
-  { name: 'Swift Dzire', category: 'sedan', seats: '4 seats', air: 'AC', rate: 'Rs 10/km', note: 'Best for city and station travel' },
-  { name: 'Honda Amaze', category: 'sedan', seats: '4 seats', air: 'AC', rate: 'Rs 11/km', note: 'Comfortable daily travel sedan' },
-  { name: 'Honda City', category: 'sedan', seats: '4 seats', air: 'AC', rate: 'Rs 13/km', note: 'Executive ride for premium bookings' },
-  { name: 'Toyota Altis', category: 'sedan', seats: '4 seats', air: 'AC', rate: 'Rs 14/km', note: 'Business class outstation option' },
-  { name: 'Ertiga', category: 'suv', seats: '7 seats', air: 'AC', rate: 'Rs 14/km', note: 'Popular family and group mover' },
-  { name: 'Innova Crysta', category: 'suv', seats: '7 seats', air: 'AC', rate: 'Rs 16/km', note: 'High-comfort intercity travel' },
-  { name: 'Temp Traveller', category: 'large', seats: '14 seats', air: 'AC', rate: 'On Request', note: 'Ideal for tours and functions' },
-  { name: 'Mini Bus', category: 'large', seats: '22 seats', air: 'Non-AC', rate: 'On Request', note: 'Group transport for events' },
-  { name: 'Full Bus', category: 'large', seats: '45 seats', air: 'Non-AC', rate: 'On Request', note: 'Bulk movement for schools and companies' },
+const FALLBACK_FLEET = [
+  { _id: 'f1', name: 'Swift Dzire', category: 'sedan', seats: '4 seats', air: 'AC', rate: 'Rs 10/km', note: 'Best for city and station travel' },
+  { _id: 'f2', name: 'Honda Amaze', category: 'sedan', seats: '4 seats', air: 'AC', rate: 'Rs 11/km', note: 'Comfortable daily travel sedan' },
+  { _id: 'f3', name: 'Honda City', category: 'sedan', seats: '4 seats', air: 'AC', rate: 'Rs 13/km', note: 'Executive ride for premium bookings' },
+  { _id: 'f4', name: 'Toyota Altis', category: 'sedan', seats: '4 seats', air: 'AC', rate: 'Rs 14/km', note: 'Business class outstation option' },
+  { _id: 'f5', name: 'Ertiga', category: 'suv', seats: '7 seats', air: 'AC', rate: 'Rs 14/km', note: 'Popular family and group mover' },
+  { _id: 'f6', name: 'Innova Crysta', category: 'suv', seats: '7 seats', air: 'AC', rate: 'Rs 16/km', note: 'High-comfort intercity travel' },
+  { _id: 'f7', name: 'Temp Traveller', category: 'large', seats: '14 seats', air: 'AC', rate: 'On Request', note: 'Ideal for tours and functions' },
+  { _id: 'f8', name: 'Mini Bus', category: 'large', seats: '22 seats', air: 'Non-AC', rate: 'On Request', note: 'Group transport for events' },
+  { _id: 'f9', name: 'Full Bus', category: 'large', seats: '45 seats', air: 'Non-AC', rate: 'On Request', note: 'Bulk movement for schools and companies' },
 ]
 
 const filters = [
@@ -62,7 +62,8 @@ const contacts = [
   ['Office address', 'SB/92 & 100, Avishkar Complex', 'Old Padra Road, Nr. Manisha Circle, Vadodara - 390015', 'https://maps.google.com/?q=SB%2F92+100+Avishkar+Complex+Old+Padra+Road+Manisha+Circle+Vadodara'],
 ]
 
-const createWhatsAppLink = (message) => `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(message)}`
+const createWhatsAppLink = (message) =>
+  `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(message)}`
 
 function buildQuickBookingMessage(form) {
   return [
@@ -92,6 +93,7 @@ function buildFullBookingMessage(form) {
 export default function LandingPage() {
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const [activeFilter, setActiveFilter] = useState('all')
+  const [fleet, setFleet] = useState(FALLBACK_FLEET)
   const [quickForm, setQuickForm] = useState({
     serviceType: serviceOptions[0],
     vehicleType: vehicleOptions[0],
@@ -109,28 +111,37 @@ export default function LandingPage() {
   })
   const [quickError, setQuickError] = useState('')
   const [bookingError, setBookingError] = useState('')
-  const visibleFleet = activeFilter === 'all' ? fleet : fleet.filter((item) => item.category === activeFilter)
+
+  useEffect(() => {
+    axios.get(buildApiUrl('/api/vehicles'))
+      .then((res) => {
+        setFleet(Array.isArray(res.data) ? res.data : [])
+      })
+      .catch(() => {
+        setFleet(FALLBACK_FLEET)
+      })
+  }, [])
+
+  const visibleFleet = activeFilter === 'all'
+    ? fleet
+    : fleet.filter((item) => item.category === activeFilter)
 
   const submitQuickForm = (event) => {
     event.preventDefault()
-
     if (!quickForm.pickupArea.trim()) {
       setQuickError('Please add a pickup area so the team knows where the trip starts.')
       return
     }
-
     setQuickError('')
     window.open(createWhatsAppLink(buildQuickBookingMessage(quickForm)), '_blank', 'noopener,noreferrer')
   }
 
   const submitBookingForm = async (event) => {
     event.preventDefault()
-
     if (!bookingForm.fullName.trim() || !bookingForm.phone.trim() || !bookingForm.pickup.trim() || !bookingForm.destination.trim()) {
       setBookingError('Please fill in name, phone, pickup, and destination before sending the enquiry.')
       return
     }
-
     try {
       await axios.post(buildApiUrl('/api/bookings'), bookingForm)
       setBookingError('')
@@ -144,6 +155,7 @@ export default function LandingPage() {
   return (
     <div className="kmc-page" id="top">
       <a className="kmc-skip-link" href="#main-content">Skip To Content</a>
+
       <header className="kmc-header">
         <a className="kmc-brand" href="#top">
           <span className="kmc-brand-box">KMC</span>
@@ -158,7 +170,7 @@ export default function LandingPage() {
           aria-expanded={isMenuOpen}
           aria-controls="kmc-mobile-nav"
           aria-label={isMenuOpen ? 'Close navigation menu' : 'Open navigation menu'}
-          onClick={() => setIsMenuOpen((current) => !current)}
+          onClick={() => setIsMenuOpen((prev) => !prev)}
         >
           <span aria-hidden="true"></span>
           <span aria-hidden="true"></span>
@@ -206,47 +218,29 @@ export default function LandingPage() {
               <div className="kmc-form-grid">
                 <label>
                   Service Type
-                  <select
-                    name="serviceType"
-                    value={quickForm.serviceType}
-                    onChange={(event) => setQuickForm((current) => ({ ...current, serviceType: event.target.value }))}
-                  >
+                  <select name="serviceType" value={quickForm.serviceType} onChange={(e) => setQuickForm((prev) => ({ ...prev, serviceType: e.target.value }))}>
                     {serviceOptions.map((item) => <option key={item}>{item}</option>)}
                   </select>
                 </label>
                 <label>
                   Vehicle Type
-                  <select
-                    name="vehicleType"
-                    value={quickForm.vehicleType}
-                    onChange={(event) => setQuickForm((current) => ({ ...current, vehicleType: event.target.value }))}
-                  >
+                  <select name="vehicleType" value={quickForm.vehicleType} onChange={(e) => setQuickForm((prev) => ({ ...prev, vehicleType: e.target.value }))}>
                     {vehicleOptions.map((item) => <option key={item}>{item}</option>)}
                   </select>
                 </label>
                 <label>
                   Travel Date
-                  <input
-                    type="date"
-                    name="travelDate"
-                    value={quickForm.travelDate}
-                    onChange={(event) => setQuickForm((current) => ({ ...current, travelDate: event.target.value }))}
-                  />
+                  <input type="date" name="travelDate" value={quickForm.travelDate} onChange={(e) => setQuickForm((prev) => ({ ...prev, travelDate: e.target.value }))} />
                 </label>
                 <label>
                   Pickup Area
-                  <input
-                    type="text"
-                    name="pickupArea"
-                    autoComplete="off"
-                    placeholder="Vadodara, Airport, Station…"
-                    value={quickForm.pickupArea}
-                    onChange={(event) => setQuickForm((current) => ({ ...current, pickupArea: event.target.value }))}
-                  />
+                  <input type="text" name="pickupArea" autoComplete="off" placeholder="Vadodara, Airport, Station..." value={quickForm.pickupArea} onChange={(e) => setQuickForm((prev) => ({ ...prev, pickupArea: e.target.value }))} />
                 </label>
               </div>
               <p className="kmc-card-text">Need urgent travel support? Call Husena Arif Rathod or the office line for quick booking help.</p>
-              {quickError ? <p className="kmc-form-error" aria-live="polite">{quickError}</p> : <p className="kmc-form-hint" aria-live="polite">This sends your trip details directly to KMC Travels on WhatsApp.</p>}
+              {quickError
+                ? <p className="kmc-form-error" aria-live="polite">{quickError}</p>
+                : <p className="kmc-form-hint" aria-live="polite">This sends your trip details directly to KMC Travels on WhatsApp.</p>}
               <button className="kmc-button kmc-button-solid kmc-button-block" type="submit">Send Quick Booking</button>
             </form>
           </div>
@@ -284,18 +278,20 @@ export default function LandingPage() {
             ))}
           </div>
           <div className="kmc-fleet-grid">
-            {visibleFleet.map((item) => (
-              <article className="kmc-fleet-card" key={item.name}>
-                <span className="kmc-fleet-type">{item.category}</span>
-                <h3>{item.name}</h3>
-                <p>{item.note}</p>
-                <div className="kmc-fleet-meta">
-                  <span>{item.seats}</span>
-                  <span>{item.air}</span>
-                  <span>{item.rate}</span>
-                </div>
-              </article>
-            ))}
+            {visibleFleet.length === 0
+              ? <p style={{ color: 'rgba(255,255,255,0.5)', gridColumn: '1/-1' }}>No vehicles in this category right now.</p>
+              : visibleFleet.map((item) => (
+                  <article className="kmc-fleet-card" key={item._id}>
+                    <span className="kmc-fleet-type">{item.category}</span>
+                    <h3>{item.name}</h3>
+                    <p>{item.note}</p>
+                    <div className="kmc-fleet-meta">
+                      <span>{item.seats}</span>
+                      <span>{item.air}</span>
+                      <span>{item.rate}</span>
+                    </div>
+                  </article>
+                ))}
           </div>
         </section>
 
@@ -365,80 +361,38 @@ export default function LandingPage() {
             <div className="kmc-form-grid kmc-form-grid-compact">
               <label>
                 Full Name
-                <input
-                  type="text"
-                  name="fullName"
-                  autoComplete="name"
-                  placeholder="Your Name…"
-                  value={bookingForm.fullName}
-                  onChange={(event) => setBookingForm((current) => ({ ...current, fullName: event.target.value }))}
-                />
+                <input type="text" name="fullName" autoComplete="name" placeholder="Your Name..." value={bookingForm.fullName} onChange={(e) => setBookingForm((prev) => ({ ...prev, fullName: e.target.value }))} />
               </label>
               <label>
                 Phone
-                <input
-                  type="tel"
-                  name="phone"
-                  autoComplete="tel"
-                  inputMode="tel"
-                  placeholder="+91 98765 43210…"
-                  value={bookingForm.phone}
-                  onChange={(event) => setBookingForm((current) => ({ ...current, phone: event.target.value }))}
-                />
+                <input type="tel" name="phone" autoComplete="tel" inputMode="tel" placeholder="+91 98765 43210..." value={bookingForm.phone} onChange={(e) => setBookingForm((prev) => ({ ...prev, phone: e.target.value }))} />
               </label>
               <label>
                 Pickup
-                <input
-                  type="text"
-                  name="pickup"
-                  autoComplete="off"
-                  placeholder="Pickup Location…"
-                  value={bookingForm.pickup}
-                  onChange={(event) => setBookingForm((current) => ({ ...current, pickup: event.target.value }))}
-                />
+                <input type="text" name="pickup" autoComplete="off" placeholder="Pickup Location..." value={bookingForm.pickup} onChange={(e) => setBookingForm((prev) => ({ ...prev, pickup: e.target.value }))} />
               </label>
               <label>
                 Destination
-                <input
-                  type="text"
-                  name="destination"
-                  autoComplete="off"
-                  placeholder="Destination…"
-                  value={bookingForm.destination}
-                  onChange={(event) => setBookingForm((current) => ({ ...current, destination: event.target.value }))}
-                />
+                <input type="text" name="destination" autoComplete="off" placeholder="Destination..." value={bookingForm.destination} onChange={(e) => setBookingForm((prev) => ({ ...prev, destination: e.target.value }))} />
               </label>
               <label>
                 Date
-                <input
-                  type="date"
-                  name="date"
-                  value={bookingForm.date}
-                  onChange={(event) => setBookingForm((current) => ({ ...current, date: event.target.value }))}
-                />
+                <input type="date" name="date" value={bookingForm.date} onChange={(e) => setBookingForm((prev) => ({ ...prev, date: e.target.value }))} />
               </label>
               <label>
                 Vehicle
-                <select
-                  name="vehicle"
-                  value={bookingForm.vehicle}
-                  onChange={(event) => setBookingForm((current) => ({ ...current, vehicle: event.target.value }))}
-                >
+                <select name="vehicle" value={bookingForm.vehicle} onChange={(e) => setBookingForm((prev) => ({ ...prev, vehicle: e.target.value }))}>
                   {vehicleOptions.map((item) => <option key={item}>{item}</option>)}
                 </select>
               </label>
               <label className="kmc-full-span">
                 Trip Notes
-                <textarea
-                  name="notes"
-                  autoComplete="off"
-                  placeholder="Passengers, Travel Timing, Special Requests…"
-                  value={bookingForm.notes}
-                  onChange={(event) => setBookingForm((current) => ({ ...current, notes: event.target.value }))}
-                ></textarea>
+                <textarea name="notes" autoComplete="off" placeholder="Passengers, Travel Timing, Special Requests..." value={bookingForm.notes} onChange={(e) => setBookingForm((prev) => ({ ...prev, notes: e.target.value }))}></textarea>
               </label>
             </div>
-            {bookingError ? <p className="kmc-form-error" aria-live="polite">{bookingError}</p> : <p className="kmc-form-hint" aria-live="polite">Your enquiry opens in WhatsApp with the booking details already filled in.</p>}
+            {bookingError
+              ? <p className="kmc-form-error" aria-live="polite">{bookingError}</p>
+              : <p className="kmc-form-hint" aria-live="polite">Your enquiry opens in WhatsApp with the booking details already filled in.</p>}
             <button className="kmc-button kmc-button-solid kmc-button-block" type="submit">Send Enquiry on WhatsApp</button>
           </form>
         </section>
